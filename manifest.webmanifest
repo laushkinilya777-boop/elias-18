@@ -1,17 +1,29 @@
 {
-  "name": "Элиас 18+",
-  "short_name": "Элиас 18+",
-  "description": "Объясняй слова друзьям: Элиас со взрослыми темами",
+  "name": "Тусим 18+ — игры на компанию",
+  "short_name": "Тусим 18+",
+  "description": "Элиас 18+, Шпион, Правда или действие и другие игры на компанию",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#14061a",
-  "theme_color": "#14061a",
+  "background_color": "#0e0513",
+  "theme_color": "#0e0513",
   "lang": "ru",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
   ]
 }

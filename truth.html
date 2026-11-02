@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e0513">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<title>Правда или действие</title>
+<style>
+  :root { --grad: linear-gradient(135deg, #ff7a45 0%, #ff3d8b 100%); }
+  #play { min-height: 100dvh; }
+  .turn { text-align: center; padding-top: 8px; }
+  .turn .who { font-family: var(--display); font-size: clamp(30px, 10vw, 44px); font-weight: 800; margin-top: 4px; word-break: break-word; }
+  .choose { flex: 1; display: grid; grid-template-rows: 1fr 1fr; gap: 14px; }
+  .choose button { border-radius: 28px; font-family: var(--display); font-size: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+  .choose button span { font-size: 54px; }
+  .choose .t { background: linear-gradient(150deg, #6d5cff, #3b1f8f); color: #fff; }
+  .choose .d { background: linear-gradient(150deg, #ff7a45, #d9265e); color: #fff; }
+  .task { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .task-card {
+    border-radius: 28px; padding: 28px 22px; min-height: 300px; display: flex; flex-direction: column; justify-content: center; gap: 16px; text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5); animation: dealIn 0.35s cubic-bezier(.2,.8,.2,1);
+  }
+  .task-card.t { background: linear-gradient(150deg, #6d5cff, #3b1f8f); }
+  .task-card.d { background: linear-gradient(150deg, #ff7a45, #d9265e); }
+  .task-card .kind { font-family: var(--display); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; }
+  .task-card .txt { font-size: clamp(22px, 6.4vw, 28px); font-weight: 800; line-height: 1.3; }
+  @keyframes dealIn { from { transform: translateY(30px) rotate(-3deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .done { background: rgba(46,229,157,0.14); color: var(--green); border: 1px solid rgba(46,229,157,0.6); padding: 18px; }
+  .chicken { background: rgba(255,181,71,0.12); color: var(--amber); border: 1px solid rgba(255,181,71,0.6); padding: 18px; }
+  .stats { display: flex; flex-direction: column; gap: 6px; }
+  .stats div { display: flex; justify-content: space-between; padding: 10px 14px; border-radius: 12px; background: var(--card); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<section class="screen active" id="setup">
+  <div class="top"><a class="back" href="./">←</a><div class="title">Правда или действие</div></div>
+  <div class="panel">
+    <h2>Игроки <span class="sub" id="pc"></span></h2>
+    <div id="playersBox"></div>
+  </div>
+  <div class="panel">
+    <h2>Накал</h2>
+    <div class="seg" id="levelSeg">
+      <button data-v="light">🙂 Лайт</button>
+      <button data-v="hot">🔥 Жара 18+</button>
+      <button data-v="mix">🎲 Микс</button>
+    </div>
+    <h2 style="margin:16px 0 12px">Очерёдность</h2>
+    <div class="seg" id="orderSeg">
+      <button data-v="round">🔁 По кругу</button>
+      <button data-v="random">🎯 Случайно</button>
+    </div>
+  </div>
+  <details class="panel rules">
+    <summary>Правила</summary>
+    <ul>
+      <li>Игрок выбирает: <b>правда</b> — честно отвечает, <b>действие</b> — выполняет задание.</li>
+      <li>Не хочешь — <b>сливайся</b>: штрафной глоток (или что придумаете). Никто не обязан делать то, что ему неприятно.</li>
+      <li>Задания с другим игроком — только если он не против.</li>
+    </ul>
+  </details>
+  <button class="primary sticky-bottom" id="startBtn" onclick="startGame()">Играть</button>
+</section>
+
+<section class="screen" id="play">
+  <div class="top"><button class="back" onclick="endGame()">✕</button><div class="title sub small" id="levelTag" style="text-align:right"></div></div>
+  <div class="turn"><p class="sub">Ходит</p><div class="who" id="who"></div></div>
+  <div class="choose" id="choose">
+    <button class="t" onclick="choose('t')"><span>🤫</span>Правда</button>
+    <button class="d" onclick="choose('d')"><span>🔥</span>Действие</button>
+  </div>
+  <div class="task" id="task" style="display:none">
+    <div class="task-card" id="taskCard"><div class="kind" id="kind"></div><div class="txt" id="txt"></div></div>
+  </div>
+  <div class="row2" id="after" style="display:none">
+    <button class="chicken" onclick="done(false)">🐔 Слился</button>
+    <button class="done" onclick="done(true)">✓ Сделано</button>
+  </div>
+</section>
+
+<section class="screen" id="stats">
+  <div class="top"><a class="back" href="./">←</a><div class="title">Кто как играл</div></div>
+  <div class="stats" id="statsList"></div>
+  <button class="primary" onclick="show('play')">Продолжить</button>
+  <button class="ghost" onclick="show('setup')">Настройки</button>
+</section>
+
+<script src="common.js"></script>
+<script>
+// {p} заменяется на случайного другого игрока; {p:в} {p:р} {p:д} {p:т} — в нужном падеже
+const Q = {
+  light: {
+    t: [
+      "Самая неловкая ситуация на свидании?","Кто тебе нравился в школе?","Что ты последнее гуглил(а)? Покажи.","Самая большая ложь родителям?",
+      "За что тебе до сих пор стыдно?","Какой твой самый странный страх?","Кого из присутствующих ты бы взял(а) на необитаемый остров?",
+      "Что бы ты изменил(а) в своей внешности?","Самый дурацкий поступок по пьяни?","О чём ты врёшь чаще всего?","Какое твоё самое странное хобби?",
+      "Кому из бывших ты бы написал(а) прямо сейчас?","Твой самый неудачный подарок?","Какую тайну друга ты разболтал(а)?",
+      "Что самое детское ты делаешь до сих пор?","На какой знаменитости ты бы женился / вышла замуж?","Самая глупая причина расставания?",
+      "Что ты делаешь, когда думаешь, что никто не видит?","Самый плохой поступок на работе или учёбе?","Что ты на самом деле думаешь про {p:в}?",
+      "Если бы ты мог(ла) поменяться жизнью с кем-то из комнаты — с кем?","Какое прозвище у тебя было в детстве?","Сколько раз ты нажимаешь «отложить» на будильнике?"
+    ],
+    d: [
+      "Изобрази курицу 30 секунд.","Покажи последнее фото в галерее.","Говори с акцентом до своего следующего хода.","Сделай 15 приседаний.",
+      "Спой куплет любой песни.","Позвони другу и скажи, что любишь его.","Дай {p:д} прочитать твоё последнее сообщение.","Станцуй без музыки 30 секунд.",
+      "Изобрази {p:в} так, чтобы все угадали.","Поставь аватарку, которую выберет {p}, на час.","Говори только шёпотом до следующего хода.",
+      "Расскажи анекдот. Никто не засмеялся — штрафной.","Сделай комплимент каждому в комнате.","Пройдись по комнате как модель на подиуме.",
+      "Отправь маме «Я тебя люблю» без пояснений.","Покажи свою лучшую пьяную походку.","Попробуй лизнуть свой локоть.",
+      "Не смейся минуту, пока все тебя смешат.","Пусть {p} нарисует что-нибудь у тебя на руке.","Изобрази тюленя, пока {p} не засмеётся.",
+      "Прочитай вслух последнее голосовое… голосом диктора новостей.","Обменяйся с {p:т} носками до конца игры."
+    ]
+  },
+  hot: {
+    t: [
+      "Сколько у тебя было партнёров?","Самое странное место, где у тебя был секс?","Твоя тайная фантазия?","Кто из присутствующих самый сексуальный?",
+      "Самый неудачный секс в жизни?","Ты когда-нибудь изменял(а)?","Что тебя заводит больше всего?","Был секс на одну ночь? Расскажи.",
+      "С кем из присутствующих ты бы пошёл / пошла на свидание?","Любимая поза?","Притворялся(лась) когда-нибудь в постели?","Когда у тебя последний раз был секс?",
+      "Самое пошлое сообщение, которое ты отправлял(а)?","Смотришь порно? Какое?","Самый безумный поцелуй в жизни?","Секс на работе или учёбе — было?",
+      "Отправлял(а) нюдсы? Кому?","Что ты любишь в теле партнёра больше всего?","Тройничок — да или нет? С кем?","Есть у тебя фетиш? Какой?",
+      "Кто из бывших был лучшим в постели и почему?","Тебя ловили в процессе? Кто?","Чего ты никогда не сделаешь в постели?",
+      "Кого из присутствующих ты бы поцеловал(а) прямо сейчас?","Что ты подумал(а), когда впервые увидел(а) {p:в}?","Оцени поцелуй {p:р} от 1 до 10, если знаешь.",
+      "Самый смелый наряд, в котором ты выходил(а) из дома?"
+    ],
+    d: [
+      "Станцуй сексуальный танец для {p:р} 30 секунд.","Поцелуй {p:в} в щёку.","Сделай {p:д} массаж плеч минуту.","Сними один предмет одежды (аксессуары не считаются).",
+      "Изобрази оргазм максимально убедительно.","Прошепчи {p:д} на ухо что-нибудь пошлое.","Сядь на колени к {p:д} до своего следующего хода.",
+      "Покажи свою самую сексуальную позу для фото.","Отправь бывшему(ей) смайлик 😏.","Покажи на своей руке, как ты целуешься.",
+      "Прочитай вслух последнее флиртующее сообщение в телефоне.","Изобрази стриптиз под любую песню 30 секунд (без раздевания).",
+      "Обними {p:в} и не отпускай 30 секунд.","Покажи историю браузера за вчера.","Говори с {p:т} соблазнительным голосом до своего следующего хода.",
+      "Изобрази, как ты соблазняешь {p:в} в баре.","Дай {p:д} выложить что угодно в твои сторис.","Сделай боди-шот с {p:т} (или съешь дольку лимона с его/её руки).",
+      "Опиши в трёх словах, как бы прошла ночь с {p:т}.","Поменяйся с {p:т} одним предметом одежды до конца игры.","Станцуй тверк 15 секунд.",
+      "Поцелуй {p:в} в шею (если {p} не против).","Посмотри {p:д} в глаза 30 секунд, не смеясь.","Сделай {p:д} комплимент про внешность — максимально конкретно."
+    ]
+  }
+};
+
+let settings = Object.assign({ level: "mix", order: "round" }, load("truth_settings") || {});
+let g = null;
+
+function bindSeg(id, key) {
+  document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => { settings[key] = b.dataset.v; renderSeg(); });
+}
+function renderSeg() {
+  [["levelSeg", "level"], ["orderSeg", "order"]].forEach(([id, key]) =>
+    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset.v === settings[key])));
+}
+bindSeg("levelSeg", "level"); bindSeg("orderSeg", "order"); renderSeg();
+
+function onPlayers(ps) {
+  $("pc").textContent = ps.length ? ps.length + " чел." : "";
+  $("startBtn").disabled = ps.length < 2;
+  $("startBtn").textContent = ps.length < 2 ? "Нужно минимум 2 игрока" : "Играть";
+}
+
+function deckFor(kind) {
+  const lv = settings.level;
+  const src = lv === "mix" ? Q.light[kind].concat(Q.hot[kind]) : Q[lv][kind];
+  return shuffle(src.slice());
+}
+function startGame() {
+  store("truth_settings", settings);
+  const ps = Players.get();
+  g = { players: ps, i: -1, decks: { t: deckFor("t"), d: deckFor("d") }, stats: ps.map(() => ({ done: 0, chicken: 0 })) };
+  $("levelTag").textContent = { light: "🙂 Лайт", hot: "🔥 Жара 18+", mix: "🎲 Микс" }[settings.level];
+  wantAwake();
+  nextTurn();
+  show("play");
+}
+function nextTurn() {
+  const n = g.players.length;
+  if (settings.order === "random") {
+    let i; do { i = Math.floor(Math.random() * n); } while (n > 1 && i === g.i);
+    g.i = i;
+  } else g.i = (g.i + 1) % n;
+  $("who").textContent = g.players[g.i];
+  $("who").style.color = Players.color(g.i);
+  $("choose").style.display = "";
+  $("task").style.display = "none";
+  $("after").style.display = "none";
+}
+function choose(kind) {
+  if (!g.decks[kind].length) g.decks[kind] = deckFor(kind);
+  const others = g.players.filter((_, i) => i !== g.i);
+  const target = others.length ? pick(others) : "сосед";
+  const text = g.decks[kind].pop().replace(/\{p(?::(.))?\}/g, (_, c) => decline(target, c));
+  $("taskCard").className = "task-card " + kind;
+  $("kind").textContent = kind === "t" ? "🤫 Правда" : "🔥 Действие";
+  $("txt").textContent = text;
+  $("choose").style.display = "none";
+  $("task").style.display = "";
+  $("after").style.display = "";
+  // перезапуск анимации
+  $("taskCard").style.animation = "none"; void $("taskCard").offsetWidth; $("taskCard").style.animation = "";
+  buzz(30);
+}
+function done(ok) {
+  g.stats[g.i][ok ? "done" : "chicken"]++;
+  if (!ok) toast("🐔 Штрафной!");
+  nextTurn();
+}
+function endGame() {
+  $("statsList").innerHTML = g.players.map((p, i) => `<div><span>${esc(p)}</span><span>✓ ${g.stats[i].done} · 🐔 ${g.stats[i].chicken}</span></div>`).join("");
+  show("stats");
+}
+
+playersEditor($("playersBox"), onPlayers);
+ageGate();
+</script>
+</body>
+</html>

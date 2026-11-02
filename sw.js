@@ -1,6 +1,6 @@
 // Кэш, чтобы игра открывалась и без интернета
-const CACHE = "elias18-v2";
-const FILES = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
+const CACHE = "tusim-v3";
+const FILES = ["./", "index.html", "elias.html", "spy.html", "truth.html", "cards.html", "common.css", "common.js", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

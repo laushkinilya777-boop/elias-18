@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e0513">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<title>Тусим 18+</title>
+<style>
+  #play { height: 100dvh; min-height: 0; overflow: hidden; }
+  .count { text-align: center; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .deck { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; touch-action: none; }
+  .qcard {
+    position: relative; width: 100%; min-height: 360px; max-height: 70vh; border-radius: 30px; padding: 30px 24px;
+    display: flex; flex-direction: column; justify-content: center; gap: 18px; text-align: center; color: #fff;
+    background: var(--cardbg); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.14);
+    will-change: transform; cursor: grab;
+  }
+  .qcard.anim { transition: transform 0.28s ease, opacity 0.28s ease; }
+  .qcard::before, .qcard::after { content: ""; position: absolute; left: 14px; right: 14px; height: 100%; border-radius: 30px; background: var(--cardbg); z-index: -1; opacity: 0.35; }
+  .qcard::before { top: 10px; transform: scale(0.96); }
+  .qcard::after { top: 20px; transform: scale(0.92); opacity: 0.18; }
+  .qcard .lead { font-family: var(--display); font-size: 15px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.85; }
+  .qcard .q { font-size: clamp(24px, 7vw, 32px); font-weight: 800; line-height: 1.25; }
+  .qcard .lvl { position: absolute; top: 16px; right: 18px; font-size: 18px; }
+  .nav { display: grid; grid-template-columns: 64px 1fr; gap: 12px; }
+  .nav .prev { padding: 0; font-size: 22px; }
+  .hint-line { text-align: center; color: var(--muted); font-size: 13px; }
+  .countdown { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; background: rgba(14,5,19,0.9); }
+  .countdown.show { display: flex; }
+  .countdown b { font-family: var(--display); font-size: 160px; animation: boom 0.9s ease; }
+  @keyframes boom { from { transform: scale(2.2); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1); } }
+</style>
+</head>
+<body>
+
+<section class="screen active" id="setup">
+  <div class="top"><a class="back" href="./">←</a><div class="title" id="title"></div></div>
+  <div class="panel center" style="padding:24px 16px">
+    <div style="font-size:64px" id="bigEm"></div>
+    <p class="sub" id="howto" style="margin-top:10px"></p>
+  </div>
+  <div class="panel">
+    <h2>Накал</h2>
+    <div class="seg" id="levelSeg">
+      <button data-v="light">🙂 Лайт</button>
+      <button data-v="hot">🔥 18+</button>
+      <button data-v="mix">🎲 Микс</button>
+    </div>
+  </div>
+  <button class="primary sticky-bottom" onclick="startGame()">Погнали</button>
+</section>
+
+<section class="screen" id="play">
+  <div class="top"><button class="back" onclick="show('setup')">✕</button><div class="title" id="title2"></div></div>
+  <div class="count" id="count"></div>
+  <div class="deck" id="deck">
+    <div class="qcard" id="qcard"><span class="lvl" id="lvl"></span><div class="lead" id="lead"></div><div class="q" id="q"></div></div>
+  </div>
+  <div class="hint-line">Свайп влево или кнопка — следующая карточка</div>
+  <div class="nav">
+    <button class="ghost prev" onclick="prev()">↶</button>
+    <button class="primary" id="nextBtn" onclick="next()">Дальше</button>
+  </div>
+</section>
+
+<div class="countdown" id="countdown"><b id="cdNum">3</b></div>
+
+<script src="common.js"></script>
+<script>
+const GAMES = {
+  never: {
+    title: "Я никогда не…", em: "🙊", lead: "Я никогда не…", bg: "linear-gradient(150deg, #0fa89a, #1d4f7a)",
+    howto: "Читаем фразу вслух. Кто это делал — пьёт глоток (или загибает палец). Загнул все пять — выбыл. Можно требовать подробностей!",
+    light: [
+      "врал(а), что уже выхожу, когда ещё лежал(а) в кровати","проезжал(а) свою остановку, потому что уснул(а)","ел(а) еду, упавшую на пол",
+      "притворялся(лась), что говорю по телефону, чтобы ни с кем не общаться","сталкерил(а) бывшего(ую) в соцсетях","плакал(а) из-за мультика",
+      "гуглил(а) себя","забывал(а) имя человека прямо во время разговора","передаривал(а) подарок","отправлял(а) сообщение не тому человеку",
+      "врал(а) о своём возрасте","уходил(а) из кафе, не заплатив","читал(а) чужую переписку","делал(а) вид, что не заметил(а) знакомого на улице",
+      "опаздывал(а) больше чем на час","притворялся(лась) больным(ой), чтобы не идти на работу или учёбу","танцевал(а) на столе",
+      "ел(а) торт прямо из коробки ночью","смотрел(а) сериал целиком за одни выходные","ругался(лась) с незнакомцем в интернете",
+      "делал(а) татуировку, о которой жалею","ночевал(а) на вокзале или в аэропорту","попадал(а) в полицию","списывал(а) на экзамене и попался(лась)",
+      "звонил(а) кому-то случайно из кармана в неловкий момент","говорил(а) «я тоже», когда официант сказал «приятного аппетита»"
+    ],
+    hot: [
+      "целовался(лась) с человеком своего пола","занимался(лась) сексом в машине","отправлял(а) нюдсы","просыпался(лась) рядом с человеком, чьё имя не помню",
+      "целовался(лась) с кем-то из этой комнаты","занимался(лась) сексом на природе","притворялся(лась) в постели","ходил(а) в стрип-клуб",
+      "смотрел(а) порно вместе с партнёром","изменял(а)","был(а) любовником / любовницей занятого человека","занимался(лась) сексом в первый вечер знакомства",
+      "покупал(а) что-то в секс-шопе","пользовался(лась) наручниками","писал(а) бывшему(ей) пьяным(ой)","спал(а) с бывшим(ей) после расставания",
+      "знакомился(лась) в приложении ради одной ночи","занимался(лась) сексом в общественном месте","попадался(лась) родителям в процессе",
+      "занимался(лась) сексом втроём","мечтал(а) о ком-то из этой комнаты","целовался(лась) с двумя людьми за один вечер","устраивал(а) стриптиз для партнёра",
+      "занимался(лась) сексом на работе","делал(а) интимные фото","был(а) на нудистском пляже","занимался(лась) сексом по телефону",
+      "просыпался(лась) не дома и не понимал(а), где я","флиртовал(а) ради бесплатного коктейля","ставил(а) засос на видном месте",
+      "встречался(лась) с кем-то сильно старше","пробовал(а) ролевые игры","врал(а) о количестве партнёров","занимался(лась) сексом в душе",
+      "терял(а) нижнее бельё на вечеринке","уходил(а) утром тихо, пока человек спал","целовался(лась) с другом / подругой «просто так»",
+      "встречался(лась) с двумя одновременно"
+    ]
+  },
+  who: {
+    title: "Кто скорее всего", em: "👉", lead: "Кто скорее всего…", bg: "linear-gradient(150deg, #8b5cf6, #4c1d95)", countdown: true,
+    howto: "Читаем вопрос, жмём «Дальше» — пойдёт отсчёт 3-2-1. На «ноль» все одновременно показывают пальцем на того, кто скорее всего так сделает. У кого больше всех пальцев — пьёт или объясняется.",
+    light: [
+      "станет миллионером","опоздает на собственную свадьбу","попадёт в новости","выживет в зомби-апокалипсисе","уснёт на вечеринке первым",
+      "потеряет телефон сегодня","станет блогером","уедет жить на Бали","забудет день рождения лучшего друга","съест последний кусок пиццы",
+      "заплачет на фильме","поругается с таксистом","начнёт бизнес и прогорит","первым женится / выйдет замуж","не отдаст микрофон в караоке",
+      "напишет книгу","попадёт в тюрьму","станет политиком","заведёт десять котов","проспит самолёт","выиграет в лотерею и всё спустит за неделю",
+      "станет звездой тиктока в 50 лет"
+    ],
+    hot: [
+      "переспит с кем-то в первый вечер знакомства","напишет бывшему(ей) сегодня ночью","проснётся завтра не дома","окажется на нудистском пляже",
+      "заведёт Онлифанс","станцует стриптиз сегодня","изменит","женится в Вегасе по пьяни","поцелует незнакомца в клубе","снимет хоум-видео",
+      "купит наручники","будет встречаться с человеком на 20 лет старше","согласится на тройничок","отправит нюдс не тому человеку",
+      "затащит всех в стрип-клуб","переспит с бывшим(ей)","закрутит служебный роман","будет громче всех за стенкой","проиграет в покер на раздевание",
+      "заведёт тайный роман","попадётся с поличным","закажет стриптизёра на день рождения","проснётся с засосом","напьётся первым сегодня",
+      "поцелует кого-то из этой комнаты до конца вечера","соблазнит бармена ради бесплатных шотов"
+    ]
+  }
+};
+
+const id = new URLSearchParams(location.search).get("g") === "who" ? "who" : "never";
+const G = GAMES[id];
+document.title = G.title;
+$("title").textContent = $("title2").textContent = G.title;
+$("bigEm").textContent = G.em;
+$("howto").textContent = G.howto;
+document.documentElement.style.setProperty("--cardbg", G.bg);
+
+let settings = Object.assign({ level: "mix" }, load("cards_" + id) || {});
+document.querySelectorAll("#levelSeg button").forEach(b => b.onclick = () => { settings.level = b.dataset.v; renderSeg(); });
+function renderSeg() { document.querySelectorAll("#levelSeg button").forEach(b => b.classList.toggle("on", b.dataset.v === settings.level)); }
+renderSeg();
+
+let cards = [], pos = 0;
+function startGame() {
+  store("cards_" + id, settings);
+  const lv = settings.level;
+  const L = G.light.map(q => ({ q, hot: false })), H = G.hot.map(q => ({ q, hot: true }));
+  cards = shuffle(lv === "light" ? L : lv === "hot" ? H : L.concat(H));
+  pos = 0;
+  render();
+  show("play");
+  wantAwake();
+}
+function render() {
+  const c = cards[pos];
+  $("lead").textContent = G.lead;
+  $("q").textContent = c.q.charAt(0).toUpperCase() + c.q.slice(1);
+  $("lvl").textContent = c.hot ? "🔥" : "";
+  $("count").textContent = `${pos + 1} / ${cards.length}`;
+  $("nextBtn").textContent = G.countdown ? "👉 Отсчёт 3-2-1" : pos === cards.length - 1 ? "Перемешать заново" : "Дальше";
+}
+function fly(dir, cb) {
+  const el = $("qcard");
+  el.classList.add("anim");
+  el.style.transform = `translateX(${dir * -130}%) rotate(${dir * -18}deg)`;
+  el.style.opacity = 0;
+  setTimeout(() => {
+    cb();
+    el.classList.remove("anim");
+    el.style.transform = `translateX(${dir * 40}%)`;
+    requestAnimationFrame(() => { el.classList.add("anim"); el.style.transform = ""; el.style.opacity = 1; });
+  }, 230);
+}
+let counting = false;
+function next() {
+  if (counting) return;
+  if (G.countdown) return countdown(() => advance());
+  advance();
+}
+function advance() {
+  buzz(20);
+  fly(1, () => { pos++; if (pos >= cards.length) { shuffle(cards); pos = 0; } render(); });
+}
+function prev() {
+  if (pos === 0 || counting) return;
+  fly(-1, () => { pos--; render(); });
+}
+// Отсчёт 3-2-1 для «Кто скорее всего», потом показываем следующий вопрос
+function countdown(done) {
+  counting = true;
+  const box = $("countdown"), num = $("cdNum");
+  let n = 3;
+  box.classList.add("show");
+  const tick = () => {
+    if (n === 0) {
+      num.textContent = "👉"; num.style.animation = "none"; void num.offsetWidth; num.style.animation = "";
+      buzz([80, 40, 200]); beep(990, 0.3, 0.2);
+      setTimeout(() => { box.classList.remove("show"); counting = false; done(); }, 1100);
+      return;
+    }
+    num.textContent = n; num.style.animation = "none"; void num.offsetWidth; num.style.animation = "";
+    beep(660, 0.12, 0.12); buzz(30);
+    n--;
+    setTimeout(tick, 800);
+  };
+  tick();
+}
+
+// Свайп карточки
+(function () {
+  const deck = $("deck"), el = $("qcard");
+  let sx = null, dx = 0;
+  deck.addEventListener("pointerdown", e => { if (counting) return; sx = e.clientX; dx = 0; el.classList.remove("anim"); deck.setPointerCapture(e.pointerId); });
+  deck.addEventListener("pointermove", e => { if (sx === null) return; dx = e.clientX - sx; el.style.transform = `translateX(${dx}px) rotate(${dx / 25}deg)`; });
+  const end = () => {
+    if (sx === null) return;
+    sx = null;
+    if (dx < -70) next();
+    else if (dx > 70 && pos > 0) prev();
+    else { el.classList.add("anim"); el.style.transform = ""; }
+    if (G.countdown && dx < -70) { el.classList.add("anim"); el.style.transform = ""; }
+  };
+  deck.addEventListener("pointerup", end);
+  deck.addEventListener("pointercancel", end);
+})();
+
+ageGate();
+</script>
+</body>
+</html>

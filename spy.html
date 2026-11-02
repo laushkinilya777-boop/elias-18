@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e0513">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<title>Шпион</title>
+<style>
+  :root { --grad: linear-gradient(135deg, #6d5cff 0%, #b44cf0 100%); }
+  .pass { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; text-align: center; }
+  .pass .step { color: var(--muted); font-weight: 700; }
+  .flip { width: 100%; perspective: 1200px; }
+  .flip-inner { position: relative; min-height: 330px; transition: transform 0.5s cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; }
+  .flip.open .flip-inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: 28px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .face.front { background: linear-gradient(150deg, #3b2a8f, #121a4a); cursor: pointer; }
+  .face.front .em { font-size: 84px; }
+  .face.rear { transform: rotateY(180deg); background: linear-gradient(160deg, var(--card2), var(--card)); }
+  .face.rear.spy { background: linear-gradient(150deg, #a1123c, #3d0820); }
+  .face .em { font-size: 64px; line-height: 1; }
+  .face .loc { font-family: var(--display); font-size: clamp(26px, 8vw, 36px); font-weight: 800; line-height: 1.15; }
+  .ring-wrap { position: relative; width: min(72vw, 280px); aspect-ratio: 1; margin: 6px auto; }
+  .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-wrap .t { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-wrap .t b { font-family: var(--display); font-size: 52px; font-variant-numeric: tabular-nums; }
+  .ring-wrap.low .t b { color: var(--red); }
+  .loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .loc-grid div { padding: 10px; border-radius: 12px; background: var(--card); font-size: 14px; font-weight: 700; }
+  .loc-grid div.x { opacity: 0.3; text-decoration: line-through; }
+  .reveal-spies { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .reveal-spies span { padding: 10px 16px; border-radius: 999px; background: rgba(255,77,94,0.18); border: 1px solid var(--red); font-weight: 800; font-size: 18px; }
+  .tips { color: var(--muted); font-size: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- Настройки -->
+<section class="screen active" id="setup">
+  <div class="top"><a class="back" href="./">←</a><div class="title">Шпион 🕵️</div></div>
+
+  <div class="panel">
+    <h2>Игроки <span class="sub" id="pc"></span></h2>
+    <div id="playersBox"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Локации</h2>
+    <div class="chips" id="sets"></div>
+  </div>
+
+  <div class="panel">
+    <div class="stepper"><span>Шпионов</span>
+      <div class="ctrl"><button onclick="step('spies',-1)">−</button><span class="val" id="spiesVal"></span><button onclick="step('spies',1)">+</button></div></div>
+    <div class="stepper"><span>Время, мин</span>
+      <div class="ctrl"><button onclick="step('minutes',-1)">−</button><span class="val" id="minVal"></span><button onclick="step('minutes',1)">+</button></div></div>
+  </div>
+
+  <details class="panel rules">
+    <summary>Правила</summary>
+    <ul>
+      <li>Телефон идёт по кругу: каждый тайно смотрит карточку. Все видят <b>одну локацию</b>, а шпион — только надпись «Ты шпион».</li>
+      <li>Игроки по очереди задают друг другу вопросы про локацию: «Часто тут бываешь?», «Как тут одеваются?». Отвечай так, чтобы свои поняли, а шпион — нет.</li>
+      <li><b>Шпион</b> побеждает, если до конца времени не вычислили, или если угадал локацию (может раскрыться в любой момент и назвать её).</li>
+      <li><b>Мирные</b> побеждают, если единогласно указали на шпиона.</li>
+    </ul>
+  </details>
+  <button class="primary sticky-bottom" id="startBtn" onclick="startGame()">Раздать карточки</button>
+</section>
+
+<!-- Передай телефон -->
+<section class="screen" id="pass">
+  <div class="top"><button class="back" id="abortBtn1" style="font-size:16px">✕</button><div class="title sub" id="passStep"></div></div>
+  <div class="pass">
+    <p class="sub">Передай телефон игроку</p>
+    <p class="big" id="passName"></p>
+    <div class="flip" id="flip">
+      <div class="flip-inner">
+        <div class="face front" onclick="reveal()">
+          <span class="em">🂠</span>
+          <b style="font-size:18px">Нажми, чтобы посмотреть</b>
+          <span class="sub small">Убедись, что никто не подглядывает</span>
+        </div>
+        <div class="face rear" id="back"></div>
+      </div>
+    </div>
+    <button class="primary wide" id="hideBtn" style="visibility:hidden" onclick="nextPlayer()">Запомнил, скрыть</button>
+  </div>
+</section>
+
+<!-- Обсуждение -->
+<section class="screen" id="play">
+  <div class="top"><button class="back" id="abortBtn2" style="font-size:16px">✕</button><div class="title">Ищем шпиона</div>
+    <button class="ghost icon-btn" id="pauseBtn" onclick="togglePause()">⏸</button></div>
+  <div class="ring-wrap" id="ring">
+    <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+      <circle id="ringArc" cx="60" cy="60" r="54" fill="none" stroke="url(#g)" stroke-width="8" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="0"/>
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d5cff"/><stop offset="1" stop-color="#ff3d8b"/></linearGradient></defs></svg>
+    <div class="t"><b id="clock">5:00</b><span class="sub small" id="clockSub">осталось</span></div>
+  </div>
+  <div class="panel center">
+    <p class="sub">Первым спрашивает</p>
+    <p class="big" style="font-size:28px;margin-top:4px" id="firstAsk"></p>
+  </div>
+  <button class="ghost wide" onclick="showLocations()">📋 Все локации</button>
+  <button class="primary" id="revealBtn">🗳 Голосуем — раскрыть</button>
+</section>
+
+<!-- Итог -->
+<section class="screen" id="end">
+  <div class="gate">
+    <div style="font-size:64px">🕵️</div>
+    <p class="sub" id="spyLabel">Шпион</p>
+    <div class="reveal-spies" id="spyNames"></div>
+    <div class="panel">
+      <p class="sub small">Локация была</p>
+      <p class="big" style="font-size:30px;margin-top:6px" id="locName"></p>
+    </div>
+    <button class="primary" onclick="startGame()">Ещё раунд</button>
+    <button class="ghost" onclick="show('setup')">Настройки</button>
+    <a class="btn ghost" href="./">Другие игры</a>
+  </div>
+</section>
+
+<script src="common.js"></script>
+<script>
+const SETS = [
+  { id: "normal", name: "🌍 Обычные", list: [
+    "Пляж","Больница","Школа","Ресторан","Самолёт","Поезд дальнего следования","Подводная лодка","Космическая станция","Казино","Банк",
+    "Полицейский участок","Цирк","Театр","Кинотеатр","Супермаркет","Спортзал","Зоопарк","Свадьба","Пиратский корабль","Военная база",
+    "Отель","Университет","Офис","Автосервис","Дача","Аэропорт","Тюрьма","Парикмахерская","Музей","Горнолыжный курорт",
+    "Круизный лайнер","Стройка","Детский лагерь","Библиотека","Рок-концерт","Почта"
+  ]},
+  { id: "adult", name: "🔞 18+", list: [
+    "Стрип-клуб","Секс-шоп","Бордель","Свингер-вечеринка","Нудистский пляж","Мальчишник","Девичник","Отель на час","Вебкам-студия","Съёмки порно",
+    "Гей-клуб","Кабинет сексолога","Бар в 4 утра","Вытрезвитель","Сауна","Кабинет гинеколога","Квартал красных фонарей","Афтепати","Тантра-ретрит","Медовый месяц",
+    "Фетиш-вечеринка","Кальянная","Караоке после полуночи","Номер для новобрачных","Вписка у друга"
+  ]},
+  { id: "party", name: "🍾 Тусовки", list: [
+    "Ночной клуб","Корпоратив","Новогодняя вечеринка","Выпускной","Хэллоуин-вечеринка","Пикник с шашлыками","Баня с друзьями","Пивной фестиваль","Рейв в лесу","Вечеринка у бассейна",
+    "День рождения в боулинге","Квартирник","Фестиваль музыки","Караоке-бар","Пьяный автобус домой"
+  ]}
+];
+
+let settings = Object.assign({ sets: ["normal", "adult"], spies: 1, minutes: 0 }, load("spy_settings") || {});
+let game = null;
+let timer = null;
+
+function maxSpies() { return Math.max(1, Math.floor(Players.get().length / 3)); }
+function autoMinutes() { return Math.min(10, Math.max(4, Players.get().length)); }
+
+function renderSetup(ps) {
+  ps = ps || Players.get();
+  const n = ps.length;
+  $("pc").textContent = n ? n + " чел." : "";
+  settings.spies = Math.min(settings.spies, maxSpies());
+  $("spiesVal").textContent = settings.spies;
+  $("minVal").textContent = settings.minutes || autoMinutes();
+  $("sets").innerHTML = SETS.map(s => `<button class="chip ${settings.sets.includes(s.id) ? "on" : ""}" onclick="toggleSet('${s.id}')">${s.name}<small>${s.list.length}</small></button>`).join("");
+  $("startBtn").disabled = n < 3;
+  $("startBtn").textContent = n < 3 ? `Нужно минимум 3 игрока` : "Раздать карточки";
+}
+function toggleSet(id) {
+  const i = settings.sets.indexOf(id);
+  if (i >= 0) { if (settings.sets.length > 1) settings.sets.splice(i, 1); }
+  else settings.sets.push(id);
+  renderSetup();
+}
+function step(key, d) {
+  if (key === "spies") settings.spies = Math.min(maxSpies(), Math.max(1, settings.spies + d));
+  else settings.minutes = Math.min(20, Math.max(2, (settings.minutes || autoMinutes()) + d));
+  renderSetup();
+}
+function locations() {
+  return SETS.filter(s => settings.sets.includes(s.id)).flatMap(s => s.list);
+}
+
+function startGame() {
+  const ps = Players.get();
+  if (ps.length < 3) { show("setup"); return; }
+  store("spy_settings", settings);
+  const locs = locations();
+  const prev = game && game.location;
+  let location = pick(locs);
+  if (locs.length > 1) while (location === prev) location = pick(locs);
+  const idx = shuffle(ps.map((_, i) => i)).slice(0, Math.min(settings.spies, maxSpies()));
+  game = { players: ps.slice(), location, spies: idx, i: 0, locs: shuffle(locs.slice()), crossed: [] };
+  showPass();
+}
+function showPass() {
+  const g = game;
+  $("passStep").textContent = `Карточка ${g.i + 1} из ${g.players.length}`;
+  $("passName").textContent = g.players[g.i];
+  $("flip").classList.remove("open");
+  $("hideBtn").style.visibility = "hidden";
+  const isSpy = g.spies.includes(g.i);
+  // наполняем обратную сторону только после переворота, чтобы её не было видно в анимации
+  $("back").className = "face rear" + (isSpy ? " spy" : "");
+  $("back").innerHTML = "";
+  show("pass");
+}
+function reveal() {
+  if ($("flip").classList.contains("open")) return;
+  const g = game, isSpy = g.spies.includes(g.i);
+  $("back").innerHTML = isSpy
+    ? `<span class="em">🕵️</span><div class="loc">Ты шпион</div><p class="sub">Слушай вопросы, вычисли локацию и не спались.${g.spies.length > 1 ? "<br>Шпионов несколько — вы не знаете друг друга." : ""}</p>`
+    : `<span class="em">📍</span><span class="sub small">Локация</span><div class="loc">${esc(g.location)}</div><p class="sub">Среди вас шпион. Не называй место прямо!</p>`;
+  $("flip").classList.add("open");
+  buzz(40);
+  setTimeout(() => $("hideBtn").style.visibility = "", 350);
+}
+function nextPlayer() {
+  // защита от двойного тапа: пока карточка не открыта, дальше не идём
+  if (!$("flip").classList.contains("open")) return;
+  game.i++;
+  $("flip").classList.remove("open");
+  if (game.i < game.players.length) setTimeout(showPass, 200);
+  else startDiscussion();
+}
+
+function startDiscussion() {
+  const total = (settings.minutes || autoMinutes()) * 60000;
+  $("firstAsk").textContent = pick(game.players);
+  $("ring").classList.remove("low");
+  $("pauseBtn").textContent = "⏸";
+  $("pauseBtn").style.visibility = "";
+  $("clockSub").textContent = "осталось";
+  show("play");
+  wantAwake();
+  beep(660, 0.15);
+  const C = 339.3;
+  let lastSec = null;
+  timer = makeTimer(total, ms => {
+    const s = Math.ceil(ms / 1000);
+    $("clock").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    $("ringArc").setAttribute("stroke-dashoffset", C * (1 - ms / total));
+    $("ring").classList.toggle("low", s <= 30);
+    if (s !== lastSec && s <= 5 && s > 0) beep(880, 0.08, 0.1);
+    lastSec = s;
+  }, () => {
+    buzz([300, 100, 300]);
+    beep(440, 0.8, 0.2);
+    $("clockSub").textContent = "время вышло — голосуйте!";
+    $("pauseBtn").style.visibility = "hidden";
+    toast("⏰ Время вышло! Голосуйте");
+  });
+  timer.start();
+}
+function togglePause() {
+  if (timer.running) { timer.pause(); $("pauseBtn").textContent = "▶"; $("clockSub").textContent = "пауза"; }
+  else { timer.start(); $("pauseBtn").textContent = "⏸"; $("clockSub").textContent = "осталось"; }
+}
+// Список локаций — шпиону удобно вычёркивать варианты
+function showLocations() {
+  openSheet(`<h2 style="margin-bottom:6px">Все локации</h2><p class="sub small" style="margin-bottom:12px">Тапни, чтобы вычеркнуть</p>
+    <div class="loc-grid" id="locGrid">${game.locs.map((l, i) => `<div data-i="${i}" class="${game.crossed.includes(i) ? "x" : ""}">${esc(l)}</div>`).join("")}</div>`);
+  $("locGrid").onclick = e => {
+    const d = e.target.closest("[data-i]");
+    if (!d) return;
+    const i = +d.dataset.i, k = game.crossed.indexOf(i);
+    k >= 0 ? game.crossed.splice(k, 1) : game.crossed.push(i);
+    d.classList.toggle("x");
+  };
+}
+function revealSpy() {
+  timer && timer.stop();
+  $("spyLabel").textContent = game.spies.length > 1 ? "Шпионы" : "Шпион";
+  $("spyNames").innerHTML = game.spies.map(i => `<span>${esc(game.players[i])}</span>`).join("");
+  $("locName").textContent = game.location;
+  buzz([60, 60, 200]);
+  show("end");
+}
+armButton($("revealBtn"), "Точно раскрыть? Нажми ещё раз", revealSpy);
+const abort = () => { timer && timer.stop(); show("setup"); };
+armButton($("abortBtn1"), "?", abort);
+armButton($("abortBtn2"), "?", abort);
+
+playersEditor($("playersBox"), renderSetup);
+ageGate();
+</script>
+</body>
+</html>
